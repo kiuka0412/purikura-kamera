@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>プリクラ風落書きWebカメラ</title>
+<style>
+  body {
+    text-align: center;
+    font-family: sans-serif;
+    background: #ffe4f0;
+  }
+  video, canvas {
+    border-radius: 20px;
+    margin-top: 20px;
+  }
+  button, select, input {
+    margin-top: 10px;
+    padding: 10px;
+    font-size: 16px;
+  }
+</style>
+</head>
+<body>
+
+<h1>プリクラ風落書きWebカメラ</h1>
+
+<video id="video" width="320" height="240" autoplay playsinline></video>
+<br>
+
+<button id="snap">撮影📸</button>
+<button id="save">保存💾</button>
+<br>
+
+<label>色:
+  <input type="color" id="color" value="#ff00aa">
+</label>
+<label>太さ:
+  <input type="number" id="size" value="5" min="1" max="50">
+</label>
+
+<br>
+<canvas id="canvas" width="320" height="240"></canvas>
+
+<script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let drawing = false;
+let color = document.getElementById('color').value;
+let size = parseInt(document.getElementById('size').value);
+
+// カメラ起動
+navigator.mediaDevices.getUserMedia({ video: true })
+  .then(stream => video.srcObject = stream)
+  .catch(err => alert('カメラが使えません: ' + err));
+
+// 色・太さ変更
+document.getElementById('color').addEventListener('input', e => color = e.target.value);
+document.getElementById('size').addEventListener('input', e => size = parseInt(e.target.value));
+
+// 撮影＋プリクラ風加工
+document.getElementById('snap').addEventListener('click', () => {
+  // 鏡写しで撮影
+  ctx.save();
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+  ctx.restore();
+
+  // 美肌＋明るさ調整
+  let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  let data = imageData.data;
+
+  for (let i = 0; i < data.length; i += 4) {
+    data[i]   = Math.min(data[i]   * 1.15 + 10, 255); // R
+    data[i+1] = Math.min(data[i+1] * 1.15 + 10, 255); // G
+    data[i+2] = Math.min(data[i+2] * 1.15 + 10, 255); // B
+  }
+  ctx.putImageData(imageData, 0, 0);
+
+  // フレーム
+  ctx.strokeStyle = 'hotpink';
+  ctx.lineWidth = 8;
+  ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+  // 日付＆タイトル
+  ctx.fillStyle = 'white';
+  ctx.font = '20px sans-serif';
+  const d = new Date();
+  ctx.fillText(
+    `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`,
+    10,
+    canvas.height - 10
+  );
+  ctx.fillText('💖 My Purikura 💖', 60, 30);
+});
+
+// 保存
+document.getElementById('save').addEventListener('click', () => {
+  const link = document.createElement('a');
+  link.download = 'purikura.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
+
+// ===== 落書き（マウス） =====
+canvas.addEventListener('mousedown', e => {
+  drawing = true;
+  ctx.beginPath();
+  ctx.moveTo(e.offsetX, e.offsetY);
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (!drawing) return;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = size;
+  ctx.lineCap = 'round';
+  ctx.shadowColor = color;      // ネオン風
+  ctx.shadowBlur = 10;
+  ctx.lineTo(e.offsetX, e.offsetY);
+  ctx.stroke();
+});
+
+canvas.addEventListener('mouseup', () => drawing = false);
+canvas.addEventListener('mouseleave', () => drawing = false);
+
+// ===== 落書き（スマホ） =====
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  drawing = true;
+  const t = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  ctx.beginPath();
+  ctx.moveTo(t.clientX - rect.left, t.clientY - rect.top);
+});
+
+canvas.addEventListener('touchmove', e => {
+  if (!drawing) return;
+  e.preventDefault();
+  const t = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = size;
+  ctx.lineCap = 'round';
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 10;
+  ctx.lineTo(t.clientX - rect.left, t.clientY - rect.top);
+  ctx.stroke();
+});
+
+canvas.addEventListener('touchend', () => drawing = false);
+</script>
+
+</body>
+</html>
