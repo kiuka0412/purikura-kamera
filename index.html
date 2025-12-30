@@ -13,7 +13,7 @@
     border-radius: 20px;
     margin-top: 20px;
   }
-  button, select, input {
+  button, input {
     margin-top: 10px;
     padding: 10px;
     font-size: 16px;
@@ -24,12 +24,10 @@
 
 <h1>プリクラ風落書きWebカメラ</h1>
 
-<video id="video" width="320" height="240" autoplay playsinline></video>
-<br>
+<video id="video" width="320" height="240" autoplay playsinline></video><br>
 
 <button id="snap">撮影📸</button>
-<button id="save">保存💾</button>
-<br>
+<button id="save">保存💾</button><br>
 
 <label>色:
   <input type="color" id="color" value="#ff00aa">
@@ -50,52 +48,64 @@ let drawing = false;
 let color = document.getElementById('color').value;
 let size = parseInt(document.getElementById('size').value);
 
-// カメラ起動
+// ===== カメラ起動 =====
 navigator.mediaDevices.getUserMedia({ video: true })
   .then(stream => video.srcObject = stream)
   .catch(err => alert('カメラが使えません: ' + err));
 
-// 色・太さ変更
+// 色・太さ
 document.getElementById('color').addEventListener('input', e => color = e.target.value);
 document.getElementById('size').addEventListener('input', e => size = parseInt(e.target.value));
 
-// 撮影＋プリクラ風加工
+// ===== 目を拡大する関数（簡易） =====
+function bigEye(cx, cy, r, scale) {
+  const img = ctx.getImageData(cx - r, cy - r, r * 2, r * 2);
+  const temp = document.createElement('canvas');
+  temp.width = r * 2;
+  temp.height = r * 2;
+  const tctx = temp.getContext('2d');
+  tctx.putImageData(img, 0, 0);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.translate(cx, cy);
+  ctx.scale(scale, scale);
+  ctx.drawImage(temp, -r, -r);
+  ctx.restore();
+}
+
+// ===== 撮影 =====
 document.getElementById('snap').addEventListener('click', () => {
-  // 鏡写しで撮影
+  // 鏡写し
   ctx.save();
   ctx.scale(-1, 1);
   ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
   ctx.restore();
 
-  // 美肌＋明るさ調整
+  // 明るさ調整（美肌）
   let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   let data = imageData.data;
-
   for (let i = 0; i < data.length; i += 4) {
-    data[i]   = Math.min(data[i]   * 1.15 + 10, 255); // R
-    data[i+1] = Math.min(data[i+1] * 1.15 + 10, 255); // G
-    data[i+2] = Math.min(data[i+2] * 1.15 + 10, 255); // B
+    data[i]   = Math.min(data[i]   * 1.15 + 10, 255);
+    data[i+1] = Math.min(data[i+1] * 1.15 + 10, 255);
+    data[i+2] = Math.min(data[i+2] * 1.15 + 10, 255);
   }
   ctx.putImageData(imageData, 0, 0);
 
-  // フレーム
-  ctx.strokeStyle = 'hotpink';
-  ctx.lineWidth = 8;
-  ctx.strokeRect(0, 0, canvas.width, canvas.height);
+  // ===== 目を3倍にする（位置はここで調整） =====
+  const eyeY = canvas.height * 0.42;
+  const leftEyeX  = canvas.width * 0.38;
+  const rightEyeX = canvas.width * 0.62;
+  const eyeRadius = 18;
+  const scale = 3.0;
 
-  // 日付＆タイトル
-  ctx.fillStyle = 'white';
-  ctx.font = '20px sans-serif';
-  const d = new Date();
-  ctx.fillText(
-    `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`,
-    10,
-    canvas.height - 10
-  );
-  ctx.fillText('💖 My Purikura 💖', 60, 30);
+  bigEye(leftEyeX, eyeY, eyeRadius, scale);
+  bigEye(rightEyeX, eyeY, eyeRadius, scale);
 });
 
-// 保存
+// ===== 保存 =====
 document.getElementById('save').addEventListener('click', () => {
   const link = document.createElement('a');
   link.download = 'purikura.png';
@@ -103,24 +113,22 @@ document.getElementById('save').addEventListener('click', () => {
   link.click();
 });
 
-// ===== 落書き（マウス） =====
+// ===== 落書き（PC） =====
 canvas.addEventListener('mousedown', e => {
   drawing = true;
   ctx.beginPath();
   ctx.moveTo(e.offsetX, e.offsetY);
 });
-
 canvas.addEventListener('mousemove', e => {
   if (!drawing) return;
   ctx.strokeStyle = color;
   ctx.lineWidth = size;
   ctx.lineCap = 'round';
-  ctx.shadowColor = color;      // ネオン風
+  ctx.shadowColor = color;
   ctx.shadowBlur = 10;
   ctx.lineTo(e.offsetX, e.offsetY);
   ctx.stroke();
 });
-
 canvas.addEventListener('mouseup', () => drawing = false);
 canvas.addEventListener('mouseleave', () => drawing = false);
 
@@ -129,25 +137,23 @@ canvas.addEventListener('touchstart', e => {
   e.preventDefault();
   drawing = true;
   const t = e.touches[0];
-  const rect = canvas.getBoundingClientRect();
+  const r = canvas.getBoundingClientRect();
   ctx.beginPath();
-  ctx.moveTo(t.clientX - rect.left, t.clientY - rect.top);
+  ctx.moveTo(t.clientX - r.left, t.clientY - r.top);
 });
-
 canvas.addEventListener('touchmove', e => {
   if (!drawing) return;
   e.preventDefault();
   const t = e.touches[0];
-  const rect = canvas.getBoundingClientRect();
+  const r = canvas.getBoundingClientRect();
   ctx.strokeStyle = color;
   ctx.lineWidth = size;
   ctx.lineCap = 'round';
   ctx.shadowColor = color;
   ctx.shadowBlur = 10;
-  ctx.lineTo(t.clientX - rect.left, t.clientY - rect.top);
+  ctx.lineTo(t.clientX - r.left, t.clientY - r.top);
   ctx.stroke();
 });
-
 canvas.addEventListener('touchend', () => drawing = false);
 </script>
 
